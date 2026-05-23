@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "name": "Адміністратор",
+    "email": "admin@gamestore.com",
+    "password": "admin123",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "name": "Користувач",
+    "email": "user@gmail.com",
+    "phone": "",
+    "password": "user123",
+    "role": "user"
+  }
+]

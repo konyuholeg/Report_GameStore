@@ -1,3 +1,4 @@
+
 import flet as ft
 from controllers.game_ctrl import GameController
 from file_storage import read, write, next_id
@@ -8,7 +9,6 @@ COLORS = [
     ft.Colors.BLUE_700, ft.Colors.RED_700, ft.Colors.GREEN_700,
     ft.Colors.ORANGE_700, ft.Colors.PINK_700,
 ]
-GENRES = ["Всі", "Шутер", "RPG", "Стратегія", "Симулятор", "Пригоди", "Спорт", "Файтинг"]
 
 
 class CatalogView:
@@ -19,10 +19,11 @@ class CatalogView:
         self.all_games = []
         self.search_query = ""
         self.current_user = None
+        self.on_login_success = None
 
         self.genre_dropdown = ft.Dropdown(
             value="Всі", width=180,
-            options=[ft.dropdown.Option(g) for g in GENRES],
+            options=[ft.dropdown.Option("Всі")],
         )
         self.price_from_field = ft.TextField(
             value="0", width=90, height=40, border_radius=8,
@@ -126,12 +127,14 @@ class CatalogView:
         self.page.update()
 
     def _show_details(self, game):
-        release = game.release_date[:4] if game.release_date else "—"
+        release = game.release_date[:4] if game.release_date else "-"
 
         if game.image_url:
             image_block = ft.Container(
-                content=ft.Image(src=game.image_url, width=320, height=180, fit=ft.ImageFit.COVER),
-                width=320, height=180, clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                content=ft.Image(src=game.image_url, width=320, height=180,
+                                 fit="contain"),
+                width=320, height=180,
+                bgcolor=ft.Colors.GREY_900,
                 border_radius=ft.BorderRadius(12, 12, 0, 0),
             )
         else:
@@ -191,7 +194,7 @@ class CatalogView:
                                     on_click=close,
                                     style=ft.ButtonStyle(color=ft.Colors.GREY_600),
                                 ),
-                                ft.ElevatedButton(
+                                ft.Button(
                                     "В кошик",
                                     on_click=add_and_close,
                                     style=ft.ButtonStyle(
@@ -235,8 +238,10 @@ class CatalogView:
         color = COLORS[idx % len(COLORS)]
         if game.image_url:
             image_block = ft.Container(
-                content=ft.Image(src=game.image_url, width=200, height=130, fit=ft.ImageFit.COVER),
-                width=200, height=130, clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                content=ft.Image(src=game.image_url, width=200, height=130,
+                                 fit="contain"),
+                width=200, height=130,
+                bgcolor=ft.Colors.GREY_900,
             )
         else:
             image_block = ft.Container(
@@ -270,7 +275,7 @@ class CatalogView:
                                     padding=ft.Padding(4, 0, 4, 0),
                                 ),
                             ),
-                            ft.ElevatedButton(
+                            ft.Button(
                                 "В кошик",
                                 on_click=lambda e, g=game: self._add_to_cart(g),
                                 style=ft.ButtonStyle(
@@ -289,6 +294,13 @@ class CatalogView:
 
     def create_view(self):
         self.all_games = self.ctrl.get_all_games()
+
+        categories = self.ctrl.get_all_categories()
+        genre_options = ["Всі"] + [c.name for c in categories]
+        self.genre_dropdown.options = [ft.dropdown.Option(g) for g in genre_options]
+        if self.genre_dropdown.value not in genre_options:
+            self.genre_dropdown.value = "Всі"
+
         self._apply_filters()
 
         filter_bar = ft.Container(
@@ -312,7 +324,7 @@ class CatalogView:
                         self.price_to_field,
                         ft.Text("₴", size=13, color=ft.Colors.GREY_700),
                     ], spacing=8),
-                    ft.ElevatedButton(
+                    ft.Button(
                         "Застосувати",
                         on_click=lambda e: self._apply_filters(),
                         style=ft.ButtonStyle(

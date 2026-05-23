@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "name": "Шутер",
+    "description": ""
+  },
+  {
+    "id": 2,
+    "name": "RPG",
+    "description": ""
+  },
+  {
+    "id": 3,
+    "name": "Стратегія",
+    "description": ""
+  },
+  {
+    "id": 4,
+    "name": "Симулятор",
+    "description": ""
+  },
+  {
+    "id": 5,
+    "name": "Пригоди",
+    "description": ""
+  },
+  {
+    "id": 6,
+    "name": "Спорт",
+    "description": ""
+  },
+  {
+    "id": 7,
+    "name": "Файтинг",
+    "description": ""
+  }
+]

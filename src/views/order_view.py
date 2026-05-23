@@ -305,7 +305,7 @@ class OrderView:
             image_url = self._get_game_image(item["game_id"])
             if image_url:
                 img = ft.Container(
-                    content=ft.Image(src=image_url, width=48, height=48, fit=ft.ImageFit.COVER),
+                    content=ft.Image(src=image_url, width=48, height=48, fit="cover"),
                     width=48, height=48, border_radius=6,
                     clip_behavior=ft.ClipBehavior.HARD_EDGE,
                 )

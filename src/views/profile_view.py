@@ -44,7 +44,7 @@ class ProfileView:
                                 color=ft.Colors.GREEN_700),
                     ]),
                     ft.Column([
-                        ft.Text(f"• {i['game_title']} x{i['quantity']} — "
+                        ft.Text(f"• {i['game_title']} x{i['quantity']} - "
                                 f"{i['quantity'] * i['unit_price']} ₴",
                                 size=12, color=ft.Colors.GREY_700)
                         for i in order.get("items", [])

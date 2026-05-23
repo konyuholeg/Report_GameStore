@@ -1,4 +1,5 @@
 import flet as ft
+import base64
 from file_storage import read, write
 from controllers.inventory_ctrl import InventoryController
 from datetime import datetime
@@ -17,6 +18,7 @@ class AdminView:
             "inventory": self._create_inventory,
             "customers": self._create_customers,
             "delivery":  self._create_delivery,
+            "games":     self._create_games,
         }
         self.content_area.content = sections.get(section, self._create_orders)()
         self.page.update()
@@ -84,9 +86,9 @@ class AdminView:
                         ]),
                         ft.Text(
                             f"Клієнт ID: {o.get('customer_id')} | "
-                            f"Телефон: {o.get('phone', '—')} | "
-                            f"Адреса: {o.get('delivery_address', '—')} | "
-                            f"Доставка: {o.get('carrier', '—')}",
+                            f"Телефон: {o.get('phone', '-')} | "
+                            f"Адреса: {o.get('delivery_address', '-')} | "
+                            f"Доставка: {o.get('carrier', '-')}",
                             size=12, color=ft.Colors.GREY_600,
                         ),
                         ft.Column([
@@ -211,7 +213,7 @@ class AdminView:
                         ft.Column([
                             ft.Text(c["name"], size=14, weight=ft.FontWeight.BOLD),
                             ft.Text(c["email"], size=12, color=ft.Colors.GREY_500),
-                            ft.Text(c.get("phone", "—"), size=12, color=ft.Colors.GREY_500),
+                            ft.Text(c.get("phone", "-"), size=12, color=ft.Colors.GREY_500),
                         ], expand=True, spacing=3),
                         ft.Text(f"Замовлень: {len(user_orders)}", size=12,
                                 color=ft.Colors.GREY_600),
@@ -246,7 +248,7 @@ class AdminView:
             for d in devs:
                 if d["id"] == did:
                     d["status"] = status
-                    if status == "delivered":
+                    if status == "доставлено":
                         d["delivered_at"] = str(datetime.now())
                     break
             write("deliveries", devs)
@@ -258,9 +260,8 @@ class AdminView:
             devs.append({
                 "id": len(devs) + 1,
                 "order_id": order_id,
-                "status": "shipped",
+                "status": "відправлено",
                 "carrier": "Нова Пошта",
-                "tracking_number": "",
                 "created_at": str(datetime.now()),
             })
             write("deliveries", devs)
@@ -276,24 +277,24 @@ class AdminView:
             delivered_ids = {d["order_id"] for d in deliveries}
             cards = []
             for d in deliveries:
-                status = d.get("status", "pending")
+                status = d.get("status", "відправлено")
                 actions = []
-                if status == "shipped":
+                if status == "відправлено":
                     actions.append(ft.TextButton(
                         "Доставлено",
-                        on_click=lambda e, did=d["id"]: update_delivery_status(did, "delivered", list_ref),
+                        on_click=lambda e, did=d["id"]: update_delivery_status(did, "доставлено", list_ref),
                         style=ft.ButtonStyle(color=ft.Colors.GREEN_700),
                     ))
                 cards.append(ft.Card(
                     content=ft.Container(
                         content=ft.Column([
                             ft.Row([
-                                ft.Text(f"Доставка — Замовлення #{d['order_id']}",
+                                ft.Text(f"Доставка - Замовлення #{d['order_id']}",
                                         size=14, weight=ft.FontWeight.BOLD),
                                 ft.Container(expand=True),
                                 ft.Text(status, size=12, color=ft.Colors.BLUE_700),
                             ]),
-                            ft.Text(f"Перевізник: {d.get('carrier', '—')}",
+                            ft.Text(f"Перевізник: {d.get('carrier', '-')}",
                                     size=12, color=ft.Colors.GREY_600),
                             ft.Row(actions, spacing=8),
                         ], spacing=6),
@@ -305,7 +306,7 @@ class AdminView:
                     cards.append(ft.Card(
                         content=ft.Container(
                             content=ft.Row([
-                                ft.Text(f"Замовлення #{o['id']} — потребує доставки",
+                                ft.Text(f"Замовлення #{o['id']} - потребує доставки",
                                         size=14, color=ft.Colors.ORANGE_700,
                                         weight=ft.FontWeight.BOLD),
                                 ft.Container(expand=True),
@@ -339,6 +340,252 @@ class AdminView:
                          bgcolor=ft.Colors.GREY_100),
         ], expand=True, spacing=0)
 
+    def _create_games(self):
+        categories = read("categories")
+        cat_options = [ft.dropdown.Option(str(c["id"]), c["name"]) for c in categories]
+
+        image_data = {"value": ""}
+
+        W = 300
+        title_f = ft.TextField(label="Назва", border_radius=8, height=44, width=W,
+                               content_padding=ft.Padding(12, 0, 12, 0), value="")
+        developer_f = ft.TextField(label="Розробник", border_radius=8, height=44, width=W,
+                                   content_padding=ft.Padding(12, 0, 12, 0), value="")
+        price_f = ft.TextField(label="Ціна (₴)", border_radius=8, height=44, width=140,
+                               content_padding=ft.Padding(12, 0, 12, 0),
+                               keyboard_type=ft.KeyboardType.NUMBER, value="")
+        stock_f = ft.TextField(label="Кількість на складі", border_radius=8, height=44, width=180,
+                               content_padding=ft.Padding(12, 0, 12, 0),
+                               keyboard_type=ft.KeyboardType.NUMBER, value="")
+        year_f = ft.TextField(label="Рік випуску", border_radius=8, height=44, width=130,
+                              content_padding=ft.Padding(12, 0, 12, 0),
+                              keyboard_type=ft.KeyboardType.NUMBER, value="")
+        cat_dd = ft.Dropdown(label="Жанр", border_radius=8, options=cat_options,
+                             value=str(categories[0]["id"]), width=160)
+
+        new_cat_field = ft.TextField(
+            label="Нова категорія", border_radius=8, height=44, width=160,
+            content_padding=ft.Padding(12, 0, 12, 0), value="",
+            hint_text="Назва жанру",
+        )
+        new_cat_status = ft.Text("", size=11, color=ft.Colors.GREEN_600)
+
+        def add_category(e):
+            name = new_cat_field.value.strip()
+            if not name:
+                new_cat_status.value = "Введіть назву"
+                new_cat_status.color = ft.Colors.RED_400
+                self.page.update()
+                return
+            cats = read("categories")
+            if any(c["name"].lower() == name.lower() for c in cats):
+                new_cat_status.value = "Вже існує"
+                new_cat_status.color = ft.Colors.RED_400
+                self.page.update()
+                return
+            new_id = max((c["id"] for c in cats), default=0) + 1
+            cats.append({"id": new_id, "name": name, "description": ""})
+            write("categories", cats)
+            cat_dd.options.append(ft.dropdown.Option(str(new_id), name))
+            cat_dd.value = str(new_id)
+            new_cat_field.value = ""
+            new_cat_status.value = f"✓ «{name}» додано"
+            new_cat_status.color = ft.Colors.GREEN_600
+            self.page.update()
+
+        desc_f = ft.TextField(label="Опис", border_radius=8, multiline=True,
+                              min_lines=3, max_lines=4, width=W * 2 + 16,
+                              content_padding=ft.Padding(12, 8, 12, 8), value="")
+        error_t = ft.Text("", color=ft.Colors.RED_400, size=12)
+
+        image_name_t = ft.Text("Зображення не вибрано", size=12, color=ft.Colors.GREY_500)
+        image_preview = ft.Container(
+            width=160, height=120,
+            border_radius=8,
+            bgcolor=ft.Colors.GREY_200,
+            alignment=ft.Alignment.CENTER,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            content=ft.Text("Тут з'явиться\nзображення",
+                             text_align=ft.TextAlign.CENTER,
+                             color=ft.Colors.GREY_500, size=11),
+        )
+
+        async def pick_image(e):
+            files = await ft.FilePicker().pick_files(
+                dialog_title="Оберіть зображення",
+                file_type=ft.FilePickerFileType.IMAGE,
+                with_data=True,
+            )
+            if not files:
+                image_name_t.value = "Вибір скасовано"
+            else:
+                f = files[0]
+                image_name_t.value = f.name
+                try:
+                    ext = f.name.split(".")[-1].lower()
+                    mime_map = {
+                        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                        "png": "image/png", "gif": "image/gif",
+                        "webp": "image/webp", "bmp": "image/bmp",
+                    }
+                    mime = mime_map.get(ext, "image/jpeg")
+                    b64 = base64.b64encode(f.bytes).decode("utf-8")
+                    data_url = f"data:{mime};base64,{b64}"
+                    image_data["value"] = data_url
+                    image_preview.content = ft.Image(
+                        src=data_url, width=160, height=120, fit="cover",
+                    )
+                except Exception as ex:
+                    image_name_t.value = f"Помилка: {ex}"
+                    image_data["value"] = ""
+            self.page.update()
+
+        def clear_fields():
+            title_f.value = ""
+            developer_f.value = ""
+            price_f.value = ""
+            stock_f.value = ""
+            year_f.value = ""
+            desc_f.value = ""
+            cat_dd.value = str(categories[0]["id"])
+            error_t.value = ""
+            new_cat_field.value = ""
+            new_cat_status.value = ""
+            image_data["value"] = ""
+            image_name_t.value = "Зображення не вибрано"
+            image_preview.content = ft.Text(
+                "Тут з'явиться\nзображення",
+                text_align=ft.TextAlign.CENTER,
+                color=ft.Colors.GREY_500, size=11,
+            )
+
+        def save(e):
+            if not title_f.value.strip():
+                error_t.value = "Введіть назву гри"
+                self.page.update()
+                return
+            if not developer_f.value.strip():
+                error_t.value = "Введіть розробника"
+                self.page.update()
+                return
+            try:
+                price = int(price_f.value)
+                stock = int(stock_f.value)
+                year = int(year_f.value)
+                if price <= 0 or stock < 0:
+                    raise ValueError
+            except ValueError:
+                error_t.value = "Перевірте ціну, кількість та рік"
+                self.page.update()
+                return
+
+            games = read("games")
+            new_id = max((g["id"] for g in games), default=0) + 1
+            title = title_f.value.strip()
+            games.append({
+                "id": new_id,
+                "title": title,
+                "developer": developer_f.value.strip(),
+                "category_id": int(cat_dd.value),
+                "price": price,
+                "stock_qty": stock,
+                "release_date": str(year),
+                "description": desc_f.value.strip(),
+                "image_url": image_data["value"],
+            })
+            write("games", games)
+            clear_fields()
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Гру '{title}' додано!"),
+                bgcolor=ft.Colors.GREEN_700, open=True,
+            )
+            self.page.update()
+
+        def reset(e):
+            clear_fields()
+            self.page.update()
+
+        return ft.Column([
+            ft.Container(
+                content=ft.Text("Додати гру", size=18, weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.GREY_800),
+                padding=ft.Padding(16, 12, 16, 12), bgcolor=ft.Colors.WHITE,
+                shadow=ft.BoxShadow(blur_radius=4, color=ft.Colors.GREY_200,
+                                   offset=ft.Offset(0, 2)),
+            ),
+            ft.Container(
+                expand=True,
+                padding=ft.Padding(24, 24, 24, 24),
+                bgcolor=ft.Colors.GREY_100,
+                content=ft.Column([
+                    ft.Card(
+                        elevation=2,
+                        width=700,
+                        content=ft.Container(
+                            padding=ft.Padding(24, 20, 24, 24),
+                            content=ft.Column([
+                                title_f,
+                                developer_f,
+                                ft.Row([price_f, ft.Container(width=12), stock_f]),
+                                ft.Row([year_f, ft.Container(width=12), cat_dd]),
+                                ft.Row([
+                                    new_cat_field,
+                                    ft.Container(width=8),
+                                    ft.Column([
+                                        ft.Button(
+                                            "+ Додати жанр",
+                                            on_click=add_category,
+                                            style=ft.ButtonStyle(
+                                                bgcolor=ft.Colors.INDIGO_700,
+                                                color=ft.Colors.WHITE,
+                                                shape=ft.RoundedRectangleBorder(radius=8),
+                                            ),
+                                        ),
+                                        new_cat_status,
+                                    ], spacing=4),
+                                ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                                desc_f,
+                                ft.Divider(),
+                                ft.Text("Зображення", size=13,
+                                        weight=ft.FontWeight.BOLD, color=ft.Colors.GREY_700),
+                                ft.Row([
+                                    image_preview,
+                                    ft.Container(width=16),
+                                    ft.Column([
+                                        image_name_t,
+                                        ft.Button(
+                                            "Вибрати фото",
+                                            on_click=pick_image,
+                                            style=ft.ButtonStyle(
+                                                bgcolor=ft.Colors.GREY_700,
+                                                color=ft.Colors.WHITE,
+                                                shape=ft.RoundedRectangleBorder(radius=8),
+                                            ),
+                                        ),
+                                    ], spacing=8),
+                                ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                                error_t,
+                                ft.Row([
+                                    ft.TextButton(
+                                        "Очистити", on_click=reset,
+                                        style=ft.ButtonStyle(color=ft.Colors.GREY_500),
+                                    ),
+                                    ft.Button(
+                                        "Зберегти гру", on_click=save,
+                                        style=ft.ButtonStyle(
+                                            bgcolor=ft.Colors.INDIGO_700,
+                                            color=ft.Colors.WHITE,
+                                            shape=ft.RoundedRectangleBorder(radius=8),
+                                        ),
+                                    ),
+                                ], alignment=ft.MainAxisAlignment.END, spacing=12),
+                            ], spacing=16),
+                        ),
+                    ),
+                ], scroll=ft.ScrollMode.AUTO),
+            ),
+        ], expand=True, spacing=0)
+
     def create_view(self):
         self._show_section("orders")
         sidebar = ft.Container(
@@ -363,6 +610,7 @@ class AdminView:
                         ("Склад", "inventory"),
                         ("Доставка", "delivery"),
                         ("Клієнти", "customers"),
+                        ("Додати гру", "games"),
                     ]
                 ],
                 ft.Container(expand=True),
