@@ -1,18 +1,14 @@
 import json
 import os
 
-STORAGE_DIR = os.path.join(os.path.dirname(__file__), "storage")
-os.makedirs(STORAGE_DIR, exist_ok=True)
-
 FILES = {
-    "games":           os.path.join(STORAGE_DIR, "games.json"),
-    "categories":      os.path.join(STORAGE_DIR, "categories.json"),
-    "orders":          os.path.join(STORAGE_DIR, "orders.json"),
-    "customers":       os.path.join(STORAGE_DIR, "customers.json"),
-    "stock_movements": os.path.join(STORAGE_DIR, "stock_movements.json"),
-    "deliveries":      os.path.join(STORAGE_DIR, "deliveries.json"),
+    "games":           "src/storage/games.json",
+    "categories":      "src/storage/categories.json",
+    "orders":          "src/storage/orders.json",
+    "customers":       "src/storage/customers.json",
+    "stock_movements": "src/storage/stock_movements.json",
+    "deliveries":      "src/storage/deliveries.json",
 }
-
 
 def read(collection: str) -> list:
     path = FILES[collection]

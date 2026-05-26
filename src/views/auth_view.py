@@ -1,6 +1,19 @@
+import re
 import flet as ft
 from file_storage import read, write, next_id
 from models.user import Customer
+
+
+def validate_email(email: str) -> bool:
+    return bool(re.match(r"^[\w-]+@[\w-]+\.\w{2,}$", email))
+
+
+def validate_password(password: str) -> bool:
+    return bool(re.match(r"^.{6,}$", password))
+
+
+def validate_name(name: str) -> bool:
+    return bool(re.match(r"^[a-zA-Zа-яА-ЯіІїЇєЄ\s']{2,}$", name))
 
 
 class AuthView:
@@ -12,18 +25,18 @@ class AuthView:
         self._dialog = None
         self._closing = False
 
-        self.name_field = ft.TextField(label="Ім'я", border_radius=8, height=48,
+        self.name_field     = ft.TextField(label="Ім'я", border_radius=8, height=48,
                                            content_padding=ft.Padding(12, 0, 12, 0))
-        self.email_field = ft.TextField(label="Email", border_radius=8, height=48,
+        self.email_field    = ft.TextField(label="Email", border_radius=8, height=48,
                                            content_padding=ft.Padding(12, 0, 12, 0),
                                            keyboard_type=ft.KeyboardType.EMAIL)
         self.password_field = ft.TextField(label="Пароль", border_radius=8, height=48,
                                            content_padding=ft.Padding(12, 0, 12, 0),
                                            password=True, can_reveal_password=True)
-        self.confirm_field = ft.TextField(label="Підтвердіть пароль", border_radius=8, height=48,
+        self.confirm_field  = ft.TextField(label="Підтвердіть пароль", border_radius=8, height=48,
                                            content_padding=ft.Padding(12, 0, 12, 0),
                                            password=True, can_reveal_password=True)
-        self.error_text = ft.Text("", color=ft.Colors.RED_400, size=13,
+        self.error_text     = ft.Text("", color=ft.Colors.RED_400, size=13,
                                       text_align=ft.TextAlign.CENTER)
         self.form_container = ft.Column(spacing=12,
                                         horizontal_alignment=ft.CrossAxisAlignment.CENTER)
@@ -118,10 +131,22 @@ class AuthView:
             self.page.update()
             return
 
+        if not validate_email(email):
+            self.error_text.color = ft.Colors.RED_400
+            self.error_text.value = "Невірний формат email (наприклад: user@gmail.com)"
+            self.page.update()
+            return
+
+        if not validate_password(password):
+            self.error_text.color = ft.Colors.RED_400
+            self.error_text.value = "Пароль має бути не менше 6 символів"
+            self.page.update()
+            return
+
         if self.is_login_mode:
             user = self._login(email, password)
             if user:
-                self._close(callback=lambda: self.on_login_success(user))
+                self._close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
             else:
                 self.error_text.color = ft.Colors.RED_400
                 self.error_text.value = "Невірний email або пароль"
@@ -129,29 +154,35 @@ class AuthView:
         else:
             name    = (self.name_field.value or "").strip()
             confirm = (self.confirm_field.value or "").strip()
+
             if not name:
                 self.error_text.color = ft.Colors.RED_400
                 self.error_text.value = "Введіть ім'я"
                 self.page.update()
-            elif password != confirm:
+                return
+
+            if not validate_name(name):
+                self.error_text.color = ft.Colors.RED_400
+                self.error_text.value = "Ім'я має містити лише літери (мінімум 2)"
+                self.page.update()
+                return
+
+            if password != confirm:
                 self.error_text.color = ft.Colors.RED_400
                 self.error_text.value = "Паролі не співпадають"
                 self.page.update()
-            elif len(password) < 6:
-                self.error_text.color = ft.Colors.RED_400
-                self.error_text.value = "Пароль мінімум 6 символів"
+                return
+
+            user = self._register(name, email, password)
+            if user:
+                self.error_text.color = ft.Colors.GREEN_700
+                self.error_text.value = f"Акаунт створено! Ласкаво просимо, {user.name}!"
                 self.page.update()
+                self._close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
             else:
-                user = self._register(name, email, password)
-                if user:
-                    self.error_text.color = ft.Colors.GREEN_700
-                    self.error_text.value = f"✓ Акаунт створено! Ласкаво просимо, {user.name}!"
-                    self.page.update()
-                    self._close(callback=lambda: self.on_login_success(user))
-                else:
-                    self.error_text.color = ft.Colors.RED_400
-                    self.error_text.value = "Цей email вже зареєстрований"
-                    self.page.update()
+                self.error_text.color = ft.Colors.RED_400
+                self.error_text.value = "Цей email вже зареєстрований"
+                self.page.update()
 
     def show_dialog(self):
         self.is_login_mode = True

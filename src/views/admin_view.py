@@ -10,7 +10,7 @@ class AdminView:
         self.page = page
         self.user = user
         self.on_logout = on_logout
-        self.content_area = ft.Container(expand=True)
+        self.content_area = ft.Container(expand=True, bgcolor=ft.Colors.GREY_100)
 
     def _show_section(self, section: str):
         sections = {
@@ -346,10 +346,9 @@ class AdminView:
 
         image_data = {"value": ""}
 
-        W = 300
-        title_f = ft.TextField(label="Назва", border_radius=8, height=44, width=W,
+        title_f = ft.TextField(label="Назва", border_radius=8, height=44, width=300,
                                content_padding=ft.Padding(12, 0, 12, 0), value="")
-        developer_f = ft.TextField(label="Розробник", border_radius=8, height=44, width=W,
+        developer_f = ft.TextField(label="Розробник", border_radius=8, height=44, width=300,
                                    content_padding=ft.Padding(12, 0, 12, 0), value="")
         price_f = ft.TextField(label="Ціна (₴)", border_radius=8, height=44, width=140,
                                content_padding=ft.Padding(12, 0, 12, 0),
@@ -394,7 +393,7 @@ class AdminView:
             self.page.update()
 
         desc_f = ft.TextField(label="Опис", border_radius=8, multiline=True,
-                              min_lines=3, max_lines=4, width=W * 2 + 16,
+                              min_lines=3, max_lines=4, width=616,
                               content_padding=ft.Padding(12, 8, 12, 8), value="")
         error_t = ft.Text("", color=ft.Colors.RED_400, size=12)
 

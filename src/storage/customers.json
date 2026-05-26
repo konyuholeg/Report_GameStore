@@ -10,7 +10,7 @@
     "id": 2,
     "name": "Користувач",
     "email": "user@gmail.com",
-    "phone": "",
+    "phone": "+380111222333",
     "password": "user123",
     "role": "user"
   }

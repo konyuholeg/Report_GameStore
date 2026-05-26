@@ -1,4 +1,3 @@
-
 import flet as ft
 from controllers.game_ctrl import GameController
 from file_storage import read, write, next_id
@@ -21,21 +20,45 @@ class CatalogView:
         self.current_user = None
         self.on_login_success = None
 
-        self.genre_dropdown = ft.Dropdown(
-            value="Всі", width=180,
-            options=[ft.dropdown.Option("Всі")],
-        )
+        self.selected_genre = "Всі"
+        self.genre_row = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=8)
         self.price_from_field = ft.TextField(
-            value="0", width=90, height=40, border_radius=8,
+            value="", width=90, height=40, border_radius=8,
             content_padding=ft.Padding(8, 0, 8, 0),
             keyboard_type=ft.KeyboardType.NUMBER,
+            border_color=ft.Colors.with_opacity(0.5, ft.Colors.WHITE),
+            focused_border_color=ft.Colors.WHITE,
+            color=ft.Colors.WHITE,
+            bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
         )
         self.price_to_field = ft.TextField(
-            value="9999", width=90, height=40, border_radius=8,
+            value="", width=90, height=40, border_radius=8,
             content_padding=ft.Padding(8, 0, 8, 0),
             keyboard_type=ft.KeyboardType.NUMBER,
+            border_color=ft.Colors.with_opacity(0.5, ft.Colors.WHITE),
+            focused_border_color=ft.Colors.WHITE,
+            color=ft.Colors.WHITE,
+            bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
         )
         self.wrap = ft.Row(wrap=True, spacing=16, run_spacing=16)
+
+    def _create_genre_row(self, genre_options):
+        def make_btn(g):
+            def on_click(e, genre=g):
+                self.selected_genre = genre
+                self._create_genre_row(genre_options)
+                self._apply_filters()
+            return ft.Button(
+                g, on_click=on_click, height=34,
+                style=ft.ButtonStyle(
+                    bgcolor=ft.Colors.WHITE if g == self.selected_genre else ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
+                    color=ft.Colors.INDIGO_700 if g == self.selected_genre else ft.Colors.WHITE,
+                    shape=ft.RoundedRectangleBorder(radius=20),
+                    padding=ft.Padding(12, 0, 12, 0),
+                ),
+            )
+        self.genre_row.controls = [make_btn(g) for g in genre_options]
+        self.page.update()
 
     def set_user(self, user):
         self.current_user = user
@@ -44,22 +67,33 @@ class CatalogView:
         self.search_query = query.strip().lower()
         self._apply_filters()
 
-    def _apply_filters(self):
-        try:
-            price_from = int(self.price_from_field.value or 0)
-        except ValueError:
-            price_from = 0
-        try:
-            price_to = int(self.price_to_field.value or 9999)
-        except ValueError:
-            price_to = 9999
+    def _reset_filters(self):
+        self.selected_genre = "Всі"
+        self.price_from_field.value = ""
+        self.price_to_field.value = ""
+        self.search_query = ""
 
-        genre = self.genre_dropdown.value or "Всі"
+    def _apply_filters(self):
+        from_val = self.price_from_field.value.strip()
+        to_val   = self.price_to_field.value.strip()
+
+        try:
+            price_from = int(from_val) if from_val else None
+        except ValueError:
+            price_from = None
+        try:
+            price_to = int(to_val) if to_val else None
+        except ValueError:
+            price_to = None
+
+        genre = self.selected_genre
         filtered = []
         for game in self.all_games:
             if genre != "Всі" and game.category.name != genre:
                 continue
-            if not (price_from <= game.price <= price_to):
+            if price_from is not None and game.price < price_from:
+                continue
+            if price_to is not None and game.price > price_to:
                 continue
             if self.search_query and self.search_query not in game.title.lower():
                 continue
@@ -71,6 +105,45 @@ class CatalogView:
     def _remove_from_overlay(self, container):
         if container in self.page.overlay:
             self.page.overlay.remove(container)
+        self.page.update()
+
+    def _show_modal(self, text, color=ft.Colors.GREEN_700, error=False):
+        modal_ref = {"obj": None}
+
+        def close(e):
+            if modal_ref["obj"] in self.page.overlay:
+                self.page.overlay.remove(modal_ref["obj"])
+            self.page.update()
+
+        modal = ft.Container(
+            content=ft.Container(
+                content=ft.Column([
+                    ft.Text("✕" if error else "", size=36, color=color,
+                            text_align=ft.TextAlign.CENTER) if error else ft.Container(height=0),
+                    ft.Text(text, size=13, color=ft.Colors.GREY_800,
+                            text_align=ft.TextAlign.CENTER),
+                    ft.Container(height=8),
+                    ft.Button(
+                        "OK",
+                        on_click=close,
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                        ),
+                    ),
+                ], spacing=8, tight=True,
+                   horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                bgcolor=ft.Colors.WHITE,
+                border_radius=16,
+                padding=ft.Padding(32, 24, 32, 24),
+                width=280,
+            ),
+            expand=True,
+            alignment=ft.Alignment.CENTER,
+            bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
+        )
+        modal_ref["obj"] = modal
+        self.page.overlay.append(modal)
         self.page.update()
 
     def _add_to_cart(self, game, details_overlay=None):
@@ -93,11 +166,23 @@ class CatalogView:
         existing = next((o for o in cart
                          if o.get("customer_id") == self.current_user.id
                          and o.get("status") == "cart"), None)
+
+        if game.stock_qty <= 0:
+            self._show_modal(f"'{game.title}' немає на складі",
+                             color=ft.Colors.RED_700, error=True)
+            return
+
         if existing:
             items = existing.get("items", [])
             found = False
             for item in items:
                 if item["game_id"] == game.id:
+                    if item["quantity"] >= game.stock_qty:
+                        self._show_modal(
+                            f"Більше немає.\nНа складі лише {game.stock_qty} шт.",
+                            color=ft.Colors.RED_700, error=True,
+                        )
+                        return
                     item["quantity"] += 1
                     found = True
                     break
@@ -120,11 +205,10 @@ class CatalogView:
             })
             write("orders", cart)
 
-        self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(f"✓ '{game.title}' додано до кошика", color=ft.Colors.WHITE),
-            bgcolor=ft.Colors.GREEN_700, open=True, duration=2000,
-        )
-        self.page.update()
+        if details_overlay is not None:
+            self._remove_from_overlay(details_overlay)
+
+        self._show_modal(f"'{game.title}'\nдодано до кошика")
 
     def _show_details(self, game):
         release = game.release_date[:4] if game.release_date else "-"
@@ -253,6 +337,8 @@ class CatalogView:
 
         return ft.Card(
             elevation=3,
+            shape=ft.RoundedRectangleBorder(radius=16),
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
             content=ft.Column([
                 image_block,
                 ft.Container(
@@ -295,57 +381,64 @@ class CatalogView:
     def create_view(self):
         self.all_games = self.ctrl.get_all_games()
 
+        self._reset_filters()
+
         categories = self.ctrl.get_all_categories()
         genre_options = ["Всі"] + [c.name for c in categories]
-        self.genre_dropdown.options = [ft.dropdown.Option(g) for g in genre_options]
-        if self.genre_dropdown.value not in genre_options:
-            self.genre_dropdown.value = "Всі"
-
+        self.selected_genre = "Всі"
+        self._create_genre_row(genre_options)
         self._apply_filters()
 
         filter_bar = ft.Container(
             content=ft.Column([
                 ft.Row([
                     ft.Text("Каталог ігор", size=20, weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.GREY_800),
+                            color=ft.Colors.WHITE),
                 ]),
                 ft.Row([
+                    ft.Text("Жанр:", size=13, color=ft.Colors.WHITE,
+                            weight=ft.FontWeight.BOLD),
+                    ft.Container(content=self.genre_row, expand=True),
+                ], spacing=8),
+                ft.Row([
                     ft.Row([
-                        ft.Text("Жанр:", size=13, color=ft.Colors.GREY_700,
+                        ft.Text("Ціна:", size=13, color=ft.Colors.WHITE,
                                 weight=ft.FontWeight.BOLD),
-                        self.genre_dropdown,
-                    ], spacing=8),
-                    ft.Row([
-                        ft.Text("Ціна:", size=13, color=ft.Colors.GREY_700,
-                                weight=ft.FontWeight.BOLD),
-                        ft.Text("від", size=12, color=ft.Colors.GREY_500),
+                        ft.Text("від", size=12,
+                                color=ft.Colors.with_opacity(0.8, ft.Colors.WHITE)),
                         self.price_from_field,
-                        ft.Text("до", size=12, color=ft.Colors.GREY_500),
+                        ft.Text("до", size=12,
+                                color=ft.Colors.with_opacity(0.8, ft.Colors.WHITE)),
                         self.price_to_field,
-                        ft.Text("₴", size=13, color=ft.Colors.GREY_700),
+                        ft.Text("₴", size=13, color=ft.Colors.WHITE),
                     ], spacing=8),
                     ft.Button(
                         "Застосувати",
                         on_click=lambda e: self._apply_filters(),
                         style=ft.ButtonStyle(
-                            bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
+                            bgcolor=ft.Colors.WHITE,
+                            color=ft.Colors.INDIGO_700,
                             shape=ft.RoundedRectangleBorder(radius=8),
                         ),
                     ),
                 ], spacing=24),
             ], spacing=10),
             padding=ft.Padding(20, 12, 20, 12),
-            bgcolor=ft.Colors.WHITE,
-            shadow=ft.BoxShadow(blur_radius=4, color=ft.Colors.GREY_200,
-                               offset=ft.Offset(0, 2)),
+            bgcolor=ft.Colors.TRANSPARENT,
         )
 
-        return ft.Column([
-            filter_bar,
-            ft.Container(
-                content=ft.Column([self.wrap], scroll=ft.ScrollMode.AUTO),
+        return ft.Container(
+            content=ft.Column(
+                [
+                    filter_bar,
+                    ft.Container(
+                        content=self.wrap,
+                        padding=ft.Padding(16, 0, 16, 16),
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
                 expand=True,
-                padding=ft.Padding(16, 16, 16, 16),
-                bgcolor=ft.Colors.GREY_100,
             ),
-        ], expand=True, spacing=0)
+            expand=True,
+            bgcolor=ft.Colors.TRANSPARENT,
+        )

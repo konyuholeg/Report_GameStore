@@ -1,6 +1,27 @@
+import re
 import flet as ft
-from file_storage import read, write
+from file_storage import read, write, next_id
+from datetime import datetime
 
+
+def validate_phone(phone: str) -> bool:
+    return bool(re.match(r"^\+380\d{9}$", phone))
+
+
+def validate_address(address: str) -> bool:
+    return bool(re.match(r"^.{5,}$", address.strip()))
+
+
+def validate_card_number(number: str) -> bool:
+    return bool(re.match(r"^\d{16}$", number))
+
+
+def validate_cvv(cvv: str) -> bool:
+    return bool(re.match(r"^\d{3}$", cvv))
+
+
+def validate_expiry(expiry: str) -> bool:
+    return bool(re.match(r"^(0[1-9]|1[0-2])\/\d{2}$", expiry))
 
 
 class OrderView:
@@ -19,7 +40,7 @@ class OrderView:
                 return o
         return None
 
-    def _remove_item(self, game_id: int):
+    def _remove_item(self, game_id):
         orders = read("orders")
         for o in orders:
             if o.get("customer_id") == self.current_user.id and o.get("status") == "cart":
@@ -30,13 +51,27 @@ class OrderView:
         self.list_view.controls = self._create_items()
         self.page.update()
 
-    def _update_qty(self, game_id: int, delta: int):
+    def _update_qty(self, game_id, delta):
+        games = read("games")
+        stock = next((g["stock_qty"] for g in games if g["id"] == game_id), 0)
+
         orders = read("orders")
         for o in orders:
             if o.get("customer_id") == self.current_user.id and o.get("status") == "cart":
                 for item in o["items"]:
                     if item["game_id"] == game_id:
-                        item["quantity"] = max(1, item["quantity"] + delta)
+                        new_qty = item["quantity"] + delta
+                        if delta > 0 and item["quantity"] >= stock:
+                            self.page.snack_bar = ft.SnackBar(
+                                content=ft.Text(
+                                    f"Більше на складі немає (доступно: {stock} шт.)",
+                                    color=ft.Colors.WHITE,
+                                ),
+                                bgcolor=ft.Colors.RED_700, open=True, duration=2500,
+                            )
+                            self.page.update()
+                            return
+                        item["quantity"] = max(1, new_qty)
                 o["total_amount"] = sum(i["quantity"] * i["unit_price"] for i in o["items"])
                 break
         write("orders", orders)
@@ -66,7 +101,6 @@ class OrderView:
             content_padding=ft.Padding(12, 0, 12, 0),
             keyboard_type=ft.KeyboardType.PHONE,
         )
-
         address_field = ft.TextField(
             label="Адреса доставки",
             hint_text="м. Київ, вул. Хрещатик 1",
@@ -74,7 +108,6 @@ class OrderView:
             content_padding=ft.Padding(12, 0, 12, 0),
             value=self.current_user.address if self.current_user.address else "",
         )
-
         card_number_field = ft.TextField(
             label="Номер картки", hint_text="XXXX XXXX XXXX XXXX",
             border_radius=8, content_padding=ft.Padding(12, 0, 12, 0),
@@ -95,14 +128,6 @@ class OrderView:
             card_number_field,
             ft.Row([expiry_field, cvv_field], spacing=12),
         ], spacing=10, visible=False)
-
-        overlay_ref = {"obj": None}
-
-        def _close_dialog():
-            o = overlay_ref["obj"]
-            if o and o in self.page.overlay:
-                self.page.overlay.remove(o)
-            self.page.update()
 
         def select_payment(method):
             payment_method["value"] = method
@@ -177,50 +202,42 @@ class OrderView:
 
         def confirm(e):
             phone = phone_field.value.strip()
-            if not phone or phone == "+380":
-                error_text.value = "Введіть номер телефону"
+            if not validate_phone(phone):
+                error_text.value = "Телефон має бути у форматі +380XXXXXXXXX (9 цифр після +380)"
                 self.page.update()
                 return
-            if not address_field.value.strip():
-                error_text.value = "Введіть адресу доставки"
+
+            address = address_field.value.strip()
+            if not validate_address(address):
+                error_text.value = "Введіть коректну адресу (мінімум 5 символів)"
                 self.page.update()
                 return
+
             if payment_method["value"] == "card":
                 card_num = card_number_field.value.replace(" ", "")
-                if len(card_num) < 16 or not card_num.isdigit():
-                    error_text.value = "Введіть коректний номер картки (16 цифр)"
+                if not validate_card_number(card_num):
+                    error_text.value = "Номер картки має містити 16 цифр"
                     self.page.update()
                     return
-                if len(cvv_field.value) != 3 or not cvv_field.value.isdigit():
-                    error_text.value = "Введіть коректний CVV (3 цифри)"
+                if not validate_cvv(cvv_field.value):
+                    error_text.value = "CVV має містити 3 цифри"
                     self.page.update()
                     return
-                if len(expiry_field.value) != 5 or expiry_field.value[2] != "/":
-                    error_text.value = "Введіть термін дії картки (MM/YY)"
+                if not validate_expiry(expiry_field.value):
+                    error_text.value = "Термін дії має бути у форматі MM/YY"
                     self.page.update()
                     return
 
             orders = read("orders")
-            confirmed_items = []
             for o in orders:
                 if o.get("customer_id") == self.current_user.id and o.get("status") == "cart":
                     o["status"] = "pending"
                     o["phone"] = phone
-                    o["delivery_address"] = address_field.value.strip()
+                    o["delivery_address"] = address
                     o["carrier"] = delivery_method["value"]
                     o["payment_method"] = payment_method["value"]
-                    confirmed_items = o.get("items", [])
                     break
             write("orders", orders)
-
-            if confirmed_items:
-                games = read("games")
-                for item in confirmed_items:
-                    for game in games:
-                        if game["id"] == item["game_id"]:
-                            game["stock_qty"] = max(0, game["stock_qty"] - item["quantity"])
-                            break
-                write("games", games)
 
             customers = read("customers")
             for c in customers:
@@ -229,62 +246,94 @@ class OrderView:
                     break
             write("customers", customers)
 
-            _close_dialog()
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Замовлення успішно оформлено!"),
-                bgcolor=ft.Colors.GREEN_700, open=True,
-            )
+            self.page.pop_dialog()
             self.list_view.controls = self._create_items()
-            self.page.update()
 
-        modal = ft.Container(
-            content=ft.Container(
+            def on_ok(e):
+                self.page.pop_dialog()
+                self.page.update()
+
+            success_dlg = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(
+                    "Замовлення успішно оформлено!",
+                    size=18, weight=ft.FontWeight.BOLD,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                content=ft.Text(
+                    "Дякуємо за покупку. Ваше замовлення передано в обробку.",
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                actions=[
+                    ft.Button(
+                        "OK",
+                        on_click=on_ok,
+                        style=ft.ButtonStyle(
+                            bgcolor=ft.Colors.INDIGO_700,
+                            color=ft.Colors.WHITE,
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                        ),
+                    ),
+                ],
+                actions_alignment=ft.MainAxisAlignment.CENTER,
+            )
+            self.page.show_dialog(success_dlg)
+
+        dialog_content = ft.Container(
+                width=440,
                 content=ft.Column([
-                    ft.Text("Оформлення замовлення", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"Сума до сплати: {total} ₴",
-                            size=16, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700),
+                    ft.Container(
+                        content=ft.Row([
+                            ft.Text("Сума:", size=13, color=ft.Colors.GREY_600),
+                            ft.Text(f"{total} ₴", size=16, weight=ft.FontWeight.BOLD,
+                                    color=ft.Colors.GREEN_700),
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        bgcolor=ft.Colors.GREEN_50, border_radius=8,
+                        padding=ft.Padding(12, 10, 12, 10),
+                    ),
                     ft.Divider(),
-                    ft.Text("Спосіб доставки", size=13, weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.GREY_700),
-                    ft.Row(list(delivery_btns.values()), spacing=8, wrap=True),
-                    ft.Text("Спосіб оплати", size=13, weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.GREY_700),
+                    ft.Text("Спосіб доставки", size=14, weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.GREY_800),
+                    ft.Row(list(delivery_btns.values()), spacing=8),
+                    address_field,
+                    phone_field,
+                    ft.Divider(),
+                    ft.Text("Спосіб оплати", size=14, weight=ft.FontWeight.BOLD,
+                            color=ft.Colors.GREY_800),
                     ft.Row(list(payment_btns.values()), spacing=8),
                     card_fields,
-                    phone_field,
-                    address_field,
+                    ft.Divider(),
                     error_text,
                     ft.Row([
                         ft.TextButton(
                             "Скасувати",
-                            on_click=lambda e: _close_dialog(),
-                            style=ft.ButtonStyle(color=ft.Colors.GREY_700),
+                            on_click=lambda e: [
+                                self.page.pop_dialog(),
+                                self.page.update(),
+                            ],
+                            style=ft.ButtonStyle(color=ft.Colors.GREY_600),
                         ),
                         ft.Button(
                             "Підтвердити",
                             on_click=confirm,
                             style=ft.ButtonStyle(
-                                bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
+                                bgcolor=ft.Colors.INDIGO_700,
+                                color=ft.Colors.WHITE,
                                 shape=ft.RoundedRectangleBorder(radius=8),
                             ),
                         ),
                     ], alignment=ft.MainAxisAlignment.END, spacing=8),
-                ], spacing=12, scroll=ft.ScrollMode.AUTO, tight=True),
-                bgcolor=ft.Colors.WHITE,
-                border_radius=16,
-                padding=ft.Padding(24, 24, 24, 24),
-                width=440,
-            ),
-            bgcolor=ft.Colors.with_opacity(0.5, ft.Colors.BLACK),
-            expand=True,
-            alignment=ft.Alignment.CENTER,
+                ], spacing=12, tight=True, scroll=ft.ScrollMode.AUTO),
+            )
+        dialog = ft.AlertDialog(
+            modal=False,
+            title=ft.Text("Оформлення замовлення", size=18, weight=ft.FontWeight.BOLD),
+            content=dialog_content,
+            actions=[],
         )
+        self.page.show_dialog(dialog)
 
-        overlay_ref["obj"] = modal
-        self.page.overlay.append(modal)
-        self.page.update()
-
-    def _get_game_image(self, game_id: int):
+    def _get_game_image(self, game_id):
         for g in read("games"):
             if g["id"] == game_id:
                 return g.get("image_url", "")
@@ -318,6 +367,11 @@ class OrderView:
                     alignment=ft.Alignment.CENTER,
                 )
 
+            # перевіряємо скільки є на складі
+            games = read("games")
+            stock = next((g["stock_qty"] for g in games if g["id"] == item["game_id"]), 0)
+            at_max = item["quantity"] >= stock
+
             items.append(ft.Card(
                 content=ft.Container(
                     content=ft.Row([
@@ -325,17 +379,24 @@ class OrderView:
                         ft.Container(width=8),
                         ft.Text(item["game_title"], size=14, weight=ft.FontWeight.BOLD,
                                 max_lines=2, overflow=ft.TextOverflow.ELLIPSIS, expand=True),
-                        ft.Row([
-                            ft.TextButton("−",
-                                on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, -1),
-                                style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
-                            ft.Text(str(item["quantity"]), size=14,
-                                    weight=ft.FontWeight.BOLD, width=30,
-                                    text_align=ft.TextAlign.CENTER),
-                            ft.TextButton("+",
-                                on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, 1),
-                                style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
-                        ], spacing=0),
+                        ft.Column([
+                            ft.Row([
+                                ft.TextButton("−",
+                                    on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, -1),
+                                    style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
+                                ft.Text(str(item["quantity"]), size=14,
+                                        weight=ft.FontWeight.BOLD, width=30,
+                                        text_align=ft.TextAlign.CENTER),
+                                ft.TextButton("+",
+                                    on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, 1),
+                                    style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
+                            ], spacing=0),
+                            ft.Text(
+                                "Більше на складі немає",
+                                size=10, color=ft.Colors.RED_400,
+                                visible=at_max,
+                            ),
+                        ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                         ft.Text(f"{item['quantity'] * item['unit_price']} ₴",
                                 size=15, weight=ft.FontWeight.BOLD,
                                 color=ft.Colors.GREEN_700, width=80,
@@ -403,6 +464,6 @@ class OrderView:
             ),
             ft.Container(
                 content=self.list_view, expand=True,
-                padding=ft.Padding(16, 16, 16, 16), bgcolor=ft.Colors.GREY_100,
+                padding=ft.Padding(16, 16, 16, 16), bgcolor=ft.Colors.TRANSPARENT,
             ),
         ], expand=True, spacing=0)

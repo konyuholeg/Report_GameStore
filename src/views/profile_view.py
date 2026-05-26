@@ -3,10 +3,11 @@ from file_storage import read
 
 
 class ProfileView:
-    def __init__(self, page: ft.Page, user, on_logout):
+    def __init__(self, page: ft.Page, user, on_logout, on_login_success=None):
         self.page = page
         self.user = user
         self.on_logout = on_logout
+        self.on_login_success = on_login_success
 
     def _get_user_orders(self):
         return [o for o in read("orders")
@@ -93,24 +94,17 @@ class ProfileView:
                     elevation=2, expand=True,
                 ),
                 expand=True, padding=ft.Padding(16, 16, 16, 16),
-                bgcolor=ft.Colors.GREY_100,
+                bgcolor=ft.Colors.TRANSPARENT,
             ),
         ], expand=True, spacing=0)
 
     def create_view_guest(self):
         from views.auth_view import AuthView
-
-        def on_login(user):
-            self.user = user
-            if self.on_logout:
-                pass
-
-        auth_view = AuthView(self.page, on_login)
+        auth_view = AuthView(self.page, self.on_login_success)
 
         return ft.Column([
             ft.Container(
                 content=ft.Column([
-                    ft.Text("👤", size=48),
                     ft.Text("Увійдіть щоб переглянути кабінет", size=16,
                             color=ft.Colors.GREY_500),
                     ft.Button(
