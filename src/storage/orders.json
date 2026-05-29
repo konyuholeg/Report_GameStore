@@ -1,3 +1,12 @@
 [
-
+  {
+    "id": 1,
+    "customer_id": 2,
+    "status": "cart",
+    "total_amount": 0,
+    "delivery_address": "",
+    "notes": "",
+    "created_at": "2026-05-29 19:46:22.472199",
+    "items": []
+  }
 ]

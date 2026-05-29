@@ -1,10 +1,10 @@
 import flet as ft
 from file_storage import read, write, next_id
+from views.app_view import create_header, GRADIENT
 from views.catalog_view import CatalogView
 from views.order_view import OrderView
 from views.profile_view import ProfileView
 from views.admin_view import AdminView
-from views.app_view import build_header
 
 
 def main(page: ft.Page):
@@ -13,7 +13,7 @@ def main(page: ft.Page):
     page.window_height = 850
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
-    page.bgcolor = "#4a00e0"
+    page.bgcolor = "#a18dc5"
 
     if not any(c["email"] == "admin@gamestore.com" for c in read("customers")):
         customers = read("customers")
@@ -28,8 +28,7 @@ def main(page: ft.Page):
     catalog_view = CatalogView(page, None)
 
     search_input = ft.TextField(
-        hint_text="Пошук ігор", border=ft.InputBorder.OUTLINE,
-        hint_style=ft.TextStyle(color=ft.Colors.WHITE),
+        hint_text="Пошук ігор...", border=ft.InputBorder.OUTLINE,
         border_radius=24,
         border_color=ft.Colors.with_opacity(0.5, ft.Colors.WHITE),
         focused_border_color=ft.Colors.WHITE,
@@ -37,83 +36,62 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.WHITE),
         prefix_icon="search",
         color=ft.Colors.WHITE,
+        hint_style=ft.TextStyle(color=ft.Colors.with_opacity(1.0, ft.Colors.WHITE)),
         on_change=lambda e: catalog_view.search_from_header(e.control.value),
     )
 
-    def navigate(route: str):
-        page.navigate(f"/{route}")
+    header = ft.Container(height=60)
+    current_view = ft.Container(expand=True)
+
+    def show_view(route: str):
+        u = state["user"]
+        if route == "catalog":
+            current_view.content = catalog_view.create_view()
+        elif route == "orders":
+            current_view.content = OrderView(
+                page, u, show_view, on_login_success
+            ).create_view()
+        elif route == "profile":
+            pv = ProfileView(page, u, logout, on_login_success)
+            current_view.content = pv.create_view() if u else pv.create_view_guest()
+        elif route == "admin":
+            if u and u.role == "admin":
+                header.height = 0
+                header.content = None
+                header.gradient = None
+                current_view.content = AdminView(page, u, logout).create_view()
+        page.update()
 
     def on_login_success(user):
         state["user"] = user
         catalog_view.set_user(user)
-        navigate("admin" if user.role == "admin" else "catalog")
+        if user.role == "admin":
+            show_view("admin")
+        else:
+            update_header(user)
+            show_view("catalog")
 
     def logout(e=None):
         state["user"] = None
         catalog_view.set_user(None)
-        navigate("catalog")
+        header.height = 60
+        header.gradient = GRADIENT
+        update_header(None)
+        show_view("catalog")
 
-    def route_change(e=None):
-        route = page.route.lstrip("/") or "catalog"
-        u = state["user"]
-
-        # Якщо не адмін намагається зайти на /admin — редирект
-        if route == "admin" and (not u or u.role != "admin"):
-            page.navigate("/catalog")
-            return
-
-        # Якщо адмін на не-адмін маршруті — редирект
-        if u and u.role == "admin" and route != "admin":
-            page.navigate("/admin")
-            return
-
-        page.views.clear()
-
-        if route == "admin" and u and u.role == "admin":
-            page.views.append(
-                ft.View(
-                    route="/admin",
-                    padding=0,
-                    bgcolor=ft.Colors.GREY_100,
-                    controls=[AdminView(page, u, logout).create_view()],
-                )
-            )
-        else:
-            header = build_header(
-                user=u,
-                search_input=search_input,
-                navigate=navigate,
-                on_login_success=on_login_success,
-                logout=logout,
-                page=page,
-            )
-
-            if route == "orders":
-                content = OrderView(page, u, navigate, on_login_success).create_view()
-            elif route == "profile":
-                pv = ProfileView(page, u, logout, on_login_success)
-                content = pv.create_view() if u else pv.create_view_guest()
-            else:
-                catalog_view.show_view = navigate
-                catalog_view.on_login_success = on_login_success
-                content = catalog_view.create_view()
-
-            page.views.append(
-                ft.View(
-                    route=f"/{route}",
-                    padding=0,
-                    bgcolor="#4a00e0",
-                    controls=[
-                        ft.Column([header, ft.Container(content=content, expand=True)],
-                                  expand=True, spacing=0)
-                    ],
-                )
-            )
-
+    def update_header(user):
+        new_header = create_header(user, search_input, show_view, on_login_success, logout, page)
+        header.content = new_header.content
+        header.gradient = new_header.gradient
+        header.height = new_header.height
+        header.padding = new_header.padding
         page.update()
 
-    page.on_route_change = route_change
-    route_change()
+    catalog_view.show_view = show_view
+    catalog_view.on_login_success = on_login_success
+    update_header(None)
+    page.add(ft.Column([header, current_view], expand=True, spacing=0))
+    show_view("catalog")
 
 
 if __name__ == '__main__':

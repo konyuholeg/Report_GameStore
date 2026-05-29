@@ -41,21 +41,21 @@ class AuthView:
         self.form_container = ft.Column(spacing=12,
                                         horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
-    def _make_submit_btn(self, label):
+    def make_submit_btn(self, label):
         return ft.Button(
-            label, on_click=self._submit,
+            label, on_click=self.submit,
             width=float("inf"), height=48,
             style=ft.ButtonStyle(bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
                                  shape=ft.RoundedRectangleBorder(radius=8)),
         )
 
-    def _make_toggle_btn(self, label):
+    def make_toggle_btn(self, label):
         return ft.TextButton(
-            label, on_click=self._toggle_mode,
+            label, on_click=self.toggle_mode,
             style=ft.ButtonStyle(color=ft.Colors.INDIGO_700),
         )
 
-    def _login(self, email, password):
+    def login(self, email, password):
         for c in read("customers"):
             if c["email"] == email and c.get("password") == password:
                 return Customer(
@@ -65,7 +65,7 @@ class AuthView:
                 )
         return None
 
-    def _register(self, name, email, password):
+    def register(self, name, email, password):
         customers = read("customers")
         if any(c["email"] == email for c in customers):
             return None
@@ -78,13 +78,13 @@ class AuthView:
         write("customers", customers)
         return Customer(**c)
 
-    def _toggle_mode(self, e):
+    def toggle_mode(self, e):
         self.is_login_mode = not self.is_login_mode
         self.error_text.value = ""
-        self._refresh_form()
+        self.refresh_form()
         self.page.update()
 
-    def _refresh_form(self):
+    def refresh_form(self):
         self.confirm_field.value = ""
         self.name_field.value = ""
         self.error_text.value = ""
@@ -93,18 +93,18 @@ class AuthView:
             self.form_container.controls = [
                 self.email_field, self.password_field,
                 self.error_text,
-                self._make_submit_btn("Увійти"),
-                self._make_toggle_btn("Немає акаунту? Зареєструватись"),
+                self.make_submit_btn("Увійти"),
+                self.make_toggle_btn("Немає акаунту? Зареєструватись"),
             ]
         else:
             self.form_container.controls = [
                 self.name_field, self.email_field, self.password_field,
                 self.confirm_field, self.error_text,
-                self._make_submit_btn("Зареєструватись"),
-                self._make_toggle_btn("Вже є акаунт? Увійти"),
+                self.make_submit_btn("Зареєструватись"),
+                self.make_toggle_btn("Вже є акаунт? Увійти"),
             ]
 
-    def _close(self, callback=None):
+    def close(self, callback=None):
         if self._closing or self._dialog is None:
             return
         self._closing = True
@@ -121,7 +121,7 @@ class AuthView:
         elif self.on_close:
             self.on_close()
 
-    def _submit(self, e):
+    def submit(self, e):
         email    = (self.email_field.value or "").strip()
         password = (self.password_field.value or "").strip()
 
@@ -144,9 +144,9 @@ class AuthView:
             return
 
         if self.is_login_mode:
-            user = self._login(email, password)
+            user = self.login(email, password)
             if user:
-                self._close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
+                self.close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
             else:
                 self.error_text.color = ft.Colors.RED_400
                 self.error_text.value = "Невірний email або пароль"
@@ -173,12 +173,12 @@ class AuthView:
                 self.page.update()
                 return
 
-            user = self._register(name, email, password)
+            user = self.register(name, email, password)
             if user:
                 self.error_text.color = ft.Colors.GREEN_700
                 self.error_text.value = f"Акаунт створено! Ласкаво просимо, {user.name}!"
                 self.page.update()
-                self._close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
+                self.close(callback=lambda: self.on_login_success(user) if self.on_login_success else None)
             else:
                 self.error_text.color = ft.Colors.RED_400
                 self.error_text.value = "Цей email вже зареєстрований"
@@ -189,7 +189,7 @@ class AuthView:
         self._closing = False
         self.email_field.value = ""
         self.password_field.value = ""
-        self._refresh_form()
+        self.refresh_form()
 
         dialog_card = ft.Container(
             content=ft.Column([
@@ -200,7 +200,7 @@ class AuthView:
                     ft.Container(expand=True),
                     ft.Button(
                         "✕",
-                        on_click=lambda e: self._close(),
+                        on_click=lambda e: self.close(),
                         style=ft.ButtonStyle(
                             bgcolor=ft.Colors.TRANSPARENT,
                             color=ft.Colors.GREY_500,

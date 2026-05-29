@@ -2,12 +2,12 @@ import json
 import os
 
 FILES = {
-    "games":           "src/storage/games.json",
-    "categories":      "src/storage/categories.json",
-    "orders":          "src/storage/orders.json",
-    "customers":       "src/storage/customers.json",
+    "games": "src/storage/games.json",
+    "categories": "src/storage/categories.json",
+    "orders": "src/storage/orders.json",
+    "customers": "src/storage/customers.json",
     "stock_movements": "src/storage/stock_movements.json",
-    "deliveries":      "src/storage/deliveries.json",
+    "deliveries": "src/storage/deliveries.json",
 }
 
 def read(collection: str) -> list:

@@ -1,4 +1,3 @@
-from file_storage import read, write, next_id
 
 
 class Customer:
@@ -14,14 +13,3 @@ class Customer:
 
     def __repr__(self):
         return f"Customer(id={self.id}, name={self.name})"
-
-
-def ensure_admin():
-    if not any(c["email"] == "admin@gamestore.com" for c in read("customers")):
-        customers = read("customers")
-        customers.append({
-            "id": next_id("customers"), "name": "Адміністратор",
-            "email": "admin@gamestore.com", "phone": "", "address": "",
-            "password": "admin123", "role": "admin",
-        })
-        write("customers", customers)

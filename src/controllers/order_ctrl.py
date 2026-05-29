@@ -24,11 +24,11 @@ class OrderController:
         data = read("orders")
         order.id = next_id("orders")
         order.created_at = datetime.now()
-        data.append(self._order_to_dict(order))
+        data.append(self.order_to_dict(order))
         write("orders", data)
         return order
 
-    def _order_to_dict(self, order):
+    def order_to_dict(self, order):
         return {
             "id": order.id,
             "customer_id": order.customer_id,

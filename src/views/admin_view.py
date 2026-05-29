@@ -12,28 +12,28 @@ class AdminView:
         self.on_logout = on_logout
         self.content_area = ft.Container(expand=True, bgcolor=ft.Colors.GREY_100)
 
-    def _show_section(self, section: str):
+    def show_section(self, section: str):
         sections = {
-            "orders":    self._create_orders,
-            "inventory": self._create_inventory,
-            "customers": self._create_customers,
-            "delivery":  self._create_delivery,
-            "games":     self._create_games,
+            "orders":    self.create_orders,
+            "inventory": self.create_inventory,
+            "customers": self.create_customers,
+            "delivery":  self.create_delivery,
+            "games":     self.create_games,
         }
-        self.content_area.content = sections.get(section, self._create_orders)()
+        self.content_area.content = sections.get(section, self.create_orders)()
         self.page.update()
 
-    def _change_order_status(self, order_id, status, list_ref):
+    def change_order_status(self, order_id, status, list_ref):
         orders = read("orders")
         for o in orders:
             if o["id"] == order_id:
                 o["status"] = status
                 break
         write("orders", orders)
-        list_ref.controls = self._create_order_cards(list_ref)
+        list_ref.controls = self.create_order_cards(list_ref)
         self.page.update()
 
-    def _create_order_cards(self, list_ref):
+    def create_order_cards(self, list_ref):
         orders = [o for o in read("orders") if o.get("status") != "cart"]
         status_labels = {
             "pending": "Очікує", "confirmed": "Підтверджено",
@@ -59,13 +59,13 @@ class AdminView:
             if ns:
                 actions.append(ft.TextButton(
                     f"→ {status_labels[ns]}",
-                    on_click=lambda e, oid=o["id"], s=ns: self._change_order_status(oid, s, list_ref),
+                    on_click=lambda e, oid=o["id"], s=ns: self.change_order_status(oid, s, list_ref),
                     style=ft.ButtonStyle(color=ft.Colors.INDIGO_700),
                 ))
             if status not in ("cancelled", "delivered"):
                 actions.append(ft.TextButton(
                     "Скасувати",
-                    on_click=lambda e, oid=o["id"]: self._change_order_status(oid, "cancelled", list_ref),
+                    on_click=lambda e, oid=o["id"]: self.change_order_status(oid, "cancelled", list_ref),
                     style=ft.ButtonStyle(color=ft.Colors.RED_400),
                 ))
             cards.append(ft.Card(
@@ -103,9 +103,9 @@ class AdminView:
             ))
         return cards
 
-    def _create_orders(self):
+    def create_orders(self):
         list_ref = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
-        list_ref.controls = self._create_order_cards(list_ref)
+        list_ref.controls = self.create_order_cards(list_ref)
         return ft.Column([
             ft.Container(
                 content=ft.Text("Замовлення", size=18, weight=ft.FontWeight.BOLD,
@@ -119,7 +119,7 @@ class AdminView:
                          bgcolor=ft.Colors.GREY_100),
         ], expand=True, spacing=0)
 
-    def _create_inventory(self):
+    def create_inventory(self):
         ctrl = InventoryController()
 
         def add_stock(game_id, qty_field, list_ref):
@@ -194,7 +194,7 @@ class AdminView:
                          bgcolor=ft.Colors.GREY_100),
         ], expand=True, spacing=0)
 
-    def _create_customers(self):
+    def create_customers(self):
         customers = [c for c in read("customers") if c.get("role") != "admin"]
         orders = read("orders")
         cards = []
@@ -239,7 +239,7 @@ class AdminView:
                          bgcolor=ft.Colors.GREY_100),
         ], expand=True, spacing=0)
 
-    def _create_delivery(self):
+    def create_delivery(self):
         orders = [o for o in read("orders")
                   if o.get("status") not in ("cart", "cancelled")]
 
@@ -340,7 +340,7 @@ class AdminView:
                          bgcolor=ft.Colors.GREY_100),
         ], expand=True, spacing=0)
 
-    def _create_games(self):
+    def create_games(self):
         categories = read("categories")
         cat_options = [ft.dropdown.Option(str(c["id"]), c["name"]) for c in categories]
 
@@ -586,7 +586,7 @@ class AdminView:
         ], expand=True, spacing=0)
 
     def create_view(self):
-        self._show_section("orders")
+        self.show_section("orders")
         sidebar = ft.Container(
             content=ft.Column([
                 ft.Container(
@@ -601,7 +601,7 @@ class AdminView:
                 *[
                     ft.TextButton(
                         label,
-                        on_click=lambda e, s=section: self._show_section(s),
+                        on_click=lambda e, s=section: self.show_section(s),
                         style=ft.ButtonStyle(color=ft.Colors.GREY_700),
                     )
                     for label, section in [

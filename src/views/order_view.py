@@ -1,7 +1,7 @@
 import re
 import flet as ft
-from file_storage import read, write, next_id
-from datetime import datetime
+from file_storage import read, write
+
 
 
 def validate_phone(phone: str) -> bool:
@@ -32,7 +32,7 @@ class OrderView:
         self.on_login_success = on_login_success
         self.list_view = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
-    def _get_cart(self):
+    def get_cart(self):
         if not self.current_user:
             return None
         for o in read("orders"):
@@ -40,7 +40,7 @@ class OrderView:
                 return o
         return None
 
-    def _remove_item(self, game_id):
+    def remove_item(self, game_id):
         orders = read("orders")
         for o in orders:
             if o.get("customer_id") == self.current_user.id and o.get("status") == "cart":
@@ -48,10 +48,10 @@ class OrderView:
                 o["total_amount"] = sum(i["quantity"] * i["unit_price"] for i in o["items"])
                 break
         write("orders", orders)
-        self.list_view.controls = self._create_items()
+        self.list_view.controls = self.create_items()
         self.page.update()
 
-    def _update_qty(self, game_id, delta):
+    def update_qty(self, game_id, delta):
         games = read("games")
         stock = next((g["stock_qty"] for g in games if g["id"] == game_id), 0)
 
@@ -75,11 +75,11 @@ class OrderView:
                 o["total_amount"] = sum(i["quantity"] * i["unit_price"] for i in o["items"])
                 break
         write("orders", orders)
-        self.list_view.controls = self._create_items()
+        self.list_view.controls = self.create_items()
         self.page.update()
 
-    def _checkout(self, e):
-        cart = self._get_cart()
+    def checkout(self, e):
+        cart = self.get_cart()
         if not cart:
             return
 
@@ -103,7 +103,7 @@ class OrderView:
         )
         address_field = ft.TextField(
             label="Адреса доставки",
-            hint_text="м. Київ, вул. Хрещатик 1",
+            hint_text="м. Львів, вул. Бахматюка 1",
             border_radius=8,
             content_padding=ft.Padding(12, 0, 12, 0),
             value=self.current_user.address if self.current_user.address else "",
@@ -229,6 +229,7 @@ class OrderView:
                     return
 
             orders = read("orders")
+            confirmed_items = []
             for o in orders:
                 if o.get("customer_id") == self.current_user.id and o.get("status") == "cart":
                     o["status"] = "pending"
@@ -236,8 +237,19 @@ class OrderView:
                     o["delivery_address"] = address
                     o["carrier"] = delivery_method["value"]
                     o["payment_method"] = payment_method["value"]
+                    confirmed_items = o.get("items", [])
                     break
             write("orders", orders)
+
+
+            if confirmed_items:
+                games = read("games")
+                for item in confirmed_items:
+                    for game in games:
+                        if game["id"] == item["game_id"]:
+                            game["stock_qty"] = max(0, game["stock_qty"] - item["quantity"])
+                            break
+                write("games", games)
 
             customers = read("customers")
             for c in customers:
@@ -247,7 +259,7 @@ class OrderView:
             write("customers", customers)
 
             self.page.pop_dialog()
-            self.list_view.controls = self._create_items()
+            self.list_view.controls = self.create_items()
 
             def on_ok(e):
                 self.page.pop_dialog()
@@ -333,14 +345,14 @@ class OrderView:
         )
         self.page.show_dialog(dialog)
 
-    def _get_game_image(self, game_id):
+    def get_game_image(self, game_id):
         for g in read("games"):
             if g["id"] == game_id:
                 return g.get("image_url", "")
         return ""
 
-    def _create_items(self):
-        cart = self._get_cart()
+    def create_items(self):
+        cart = self.get_cart()
         if not cart or not cart.get("items"):
             return [ft.Container(
                 content=ft.Column([
@@ -351,7 +363,7 @@ class OrderView:
 
         items = []
         for item in cart["items"]:
-            image_url = self._get_game_image(item["game_id"])
+            image_url = self.get_game_image(item["game_id"])
             if image_url:
                 img = ft.Container(
                     content=ft.Image(src=image_url, width=48, height=48, fit="cover"),
@@ -367,7 +379,7 @@ class OrderView:
                     alignment=ft.Alignment.CENTER,
                 )
 
-            # перевіряємо скільки є на складі
+
             games = read("games")
             stock = next((g["stock_qty"] for g in games if g["id"] == item["game_id"]), 0)
             at_max = item["quantity"] >= stock
@@ -382,14 +394,14 @@ class OrderView:
                         ft.Column([
                             ft.Row([
                                 ft.TextButton("−",
-                                    on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, -1),
-                                    style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
+                                              on_click=lambda e, gid=item["game_id"]: self.update_qty(gid, -1),
+                                              style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
                                 ft.Text(str(item["quantity"]), size=14,
                                         weight=ft.FontWeight.BOLD, width=30,
                                         text_align=ft.TextAlign.CENTER),
                                 ft.TextButton("+",
-                                    on_click=lambda e, gid=item["game_id"]: self._update_qty(gid, 1),
-                                    style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
+                                              on_click=lambda e, gid=item["game_id"]: self.update_qty(gid, 1),
+                                              style=ft.ButtonStyle(color=ft.Colors.GREY_700)),
                             ], spacing=0),
                             ft.Text(
                                 "Більше на складі немає",
@@ -402,8 +414,8 @@ class OrderView:
                                 color=ft.Colors.GREEN_700, width=80,
                                 text_align=ft.TextAlign.RIGHT),
                         ft.TextButton("x",
-                            on_click=lambda e, gid=item["game_id"]: self._remove_item(gid),
-                            style=ft.ButtonStyle(color=ft.Colors.RED_400)),
+                                      on_click=lambda e, gid=item["game_id"]: self.remove_item(gid),
+                                      style=ft.ButtonStyle(color=ft.Colors.RED_400)),
                     ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=ft.Padding(16, 12, 16, 12),
                 ), elevation=2,
@@ -416,7 +428,7 @@ class OrderView:
                     ft.Text(f"Разом: {total} ₴", size=18, weight=ft.FontWeight.BOLD),
                     ft.Button(
                         "Оформити замовлення",
-                        on_click=self._checkout,
+                        on_click=self.checkout,
                         style=ft.ButtonStyle(
                             bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
                             shape=ft.RoundedRectangleBorder(radius=8),
@@ -451,7 +463,7 @@ class OrderView:
             ], expand=True)
 
         self.list_view = ft.Column(
-            controls=self._create_items(),
+            controls=self.create_items(),
             spacing=8, scroll=ft.ScrollMode.AUTO, expand=True,
         )
         return ft.Column([

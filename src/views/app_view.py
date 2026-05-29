@@ -4,11 +4,11 @@ from views.auth_view import AuthView
 GRADIENT = ft.LinearGradient(
     begin=ft.Alignment(-1, -1),
     end=ft.Alignment(1, 1),
-    colors=["#4a00e0", "#8e2de2"],
+    colors=["#4527a0", "#5e35b1"],
 )
 
 
-def build_header(user, search_input, navigate, on_login_success, logout, page):
+def create_header(user, search_input, navigate, on_login_success, logout, page):
     def nav_btn(text, route):
         return ft.TextButton(
             text, on_click=lambda e: navigate(route),

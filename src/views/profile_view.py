@@ -9,11 +9,11 @@ class ProfileView:
         self.on_logout = on_logout
         self.on_login_success = on_login_success
 
-    def _get_user_orders(self):
+    def get_user_orders(self):
         return [o for o in read("orders")
                 if o.get("customer_id") == self.user.id and o.get("status") != "cart"]
 
-    def _order_card(self, order):
+    def order_card(self, order):
         status_colors = {
             "pending": ft.Colors.ORANGE, "confirmed": ft.Colors.BLUE,
             "shipped": ft.Colors.PURPLE, "delivered": ft.Colors.GREEN,
@@ -58,8 +58,8 @@ class ProfileView:
         )
 
     def create_view(self):
-        orders = self._get_user_orders()
-        order_cards = [self._order_card(o) for o in orders] if orders else [
+        orders = self.get_user_orders()
+        order_cards = [self.order_card(o) for o in orders] if orders else [
             ft.Container(
                 content=ft.Text("Замовлень поки немає", color=ft.Colors.GREY_500, size=14),
                 padding=ft.Padding(0, 8, 0, 8),

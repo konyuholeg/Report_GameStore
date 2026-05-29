@@ -8,10 +8,11 @@
   },
   {
     "id": 2,
-    "name": "Користувач",
+    "name": "user",
     "email": "user@gmail.com",
-    "phone": "+380111222333",
-    "password": "user123",
+    "phone": "",
+    "address": "",
+    "password": "ab1234",
     "role": "user"
   }
 ]

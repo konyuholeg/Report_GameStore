@@ -8,7 +8,7 @@ class GameController:
         data = read("games")
         if category_id:
             data = [g for g in data if g["category_id"] == category_id]
-        return [self._dict_to_game(g) for g in data]
+        return [self.dict_to_game(g) for g in data]
 
     def get_all_categories(self):
         return [Category(**c) for c in read("categories")]
@@ -16,12 +16,12 @@ class GameController:
     def find_by_id(self, game_id):
         for g in read("games"):
             if g["id"] == game_id:
-                return self._dict_to_game(g)
+                return self.dict_to_game(g)
         return None
 
     def search(self, query):
         q = query.lower()
-        return [self._dict_to_game(g) for g in read("games")
+        return [self.dict_to_game(g) for g in read("games")
                 if q in g["title"].lower() or q in g["developer"].lower()]
 
     def update_stock(self, game_id, quantity_delta):
@@ -47,9 +47,9 @@ class GameController:
         }
         data.append(new_game)
         write("games", data)
-        return self._dict_to_game(new_game)
+        return self.dict_to_game(new_game)
 
-    def _dict_to_game(self, d):
+    def dict_to_game(self, d):
         cats = {c.id: c for c in self.get_all_categories()}
         cat = cats.get(d["category_id"], Category(id=0, name="Без категорії"))
         return Game(

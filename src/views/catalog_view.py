@@ -42,12 +42,12 @@ class CatalogView:
         )
         self.wrap = ft.Row(wrap=True, spacing=16, run_spacing=16)
 
-    def _create_genre_row(self, genre_options):
+    def create_genre_row(self, genre_options):
         def make_btn(g):
             def on_click(e, genre=g):
                 self.selected_genre = genre
-                self._create_genre_row(genre_options)
-                self._apply_filters()
+                self.create_genre_row(genre_options)
+                self.apply_filters()
             return ft.Button(
                 g, on_click=on_click, height=34,
                 style=ft.ButtonStyle(
@@ -65,15 +65,15 @@ class CatalogView:
 
     def search_from_header(self, query: str):
         self.search_query = query.strip().lower()
-        self._apply_filters()
+        self.apply_filters()
 
-    def _reset_filters(self):
+    def reset_filters(self):
         self.selected_genre = "Всі"
         self.price_from_field.value = ""
         self.price_to_field.value = ""
         self.search_query = ""
 
-    def _apply_filters(self):
+    def apply_filters(self):
         from_val = self.price_from_field.value.strip()
         to_val   = self.price_to_field.value.strip()
 
@@ -99,15 +99,15 @@ class CatalogView:
                 continue
             filtered.append(game)
 
-        self.wrap.controls = [self._game_card(g, i) for i, g in enumerate(filtered)]
+        self.wrap.controls = [self.game_card(g, i) for i, g in enumerate(filtered)]
         self.page.update()
 
-    def _remove_from_overlay(self, container):
+    def remove_from_overlay(self, container):
         if container in self.page.overlay:
             self.page.overlay.remove(container)
         self.page.update()
 
-    def _show_modal(self, text, color=ft.Colors.GREEN_700, error=False):
+    def show_modal(self, text, color=ft.Colors.GREEN_700, error=False):
         modal_ref = {"obj": None}
 
         def close(e):
@@ -146,16 +146,16 @@ class CatalogView:
         self.page.overlay.append(modal)
         self.page.update()
 
-    def _add_to_cart(self, game, details_overlay=None):
+    def add_to_cart(self, game, details_overlay=None):
         if not self.current_user:
             from views.auth_view import AuthView
 
             if details_overlay is not None:
-                self._remove_from_overlay(details_overlay)
+                self.remove_from_overlay(details_overlay)
 
             def on_success(user):
                 self.current_user = user
-                self._add_to_cart(game)
+                self.add_to_cart(game)
                 if self.on_login_success:
                     self.on_login_success(user)
 
@@ -168,8 +168,8 @@ class CatalogView:
                          and o.get("status") == "cart"), None)
 
         if game.stock_qty <= 0:
-            self._show_modal(f"'{game.title}' немає на складі",
-                             color=ft.Colors.RED_700, error=True)
+            self.show_modal(f"'{game.title}' немає на складі",
+                            color=ft.Colors.RED_700, error=True)
             return
 
         if existing:
@@ -178,7 +178,7 @@ class CatalogView:
             for item in items:
                 if item["game_id"] == game.id:
                     if item["quantity"] >= game.stock_qty:
-                        self._show_modal(
+                        self.show_modal(
                             f"Більше немає.\nНа складі лише {game.stock_qty} шт.",
                             color=ft.Colors.RED_700, error=True,
                         )
@@ -206,11 +206,11 @@ class CatalogView:
             write("orders", cart)
 
         if details_overlay is not None:
-            self._remove_from_overlay(details_overlay)
+            self.remove_from_overlay(details_overlay)
 
-        self._show_modal(f"'{game.title}'\nдодано до кошика")
+        self.show_modal(f"'{game.title}'\nдодано до кошика")
 
-    def _show_details(self, game):
+    def show_details(self, game):
         release = game.release_date[:4] if game.release_date else "-"
 
         if game.image_url:
@@ -235,10 +235,10 @@ class CatalogView:
         overlay_ref = {"obj": None}
 
         def close(e):
-            self._remove_from_overlay(overlay_ref["obj"])
+            self.remove_from_overlay(overlay_ref["obj"])
 
         def add_and_close(e):
-            self._add_to_cart(game, details_overlay=overlay_ref["obj"])
+            self.add_to_cart(game, details_overlay=overlay_ref["obj"])
 
         card = ft.Container(
             content=ft.Column([
@@ -318,7 +318,7 @@ class CatalogView:
         self.page.overlay.append(overlay)
         self.page.update()
 
-    def _game_card(self, game, idx=0):
+    def game_card(self, game, idx=0):
         color = COLORS[idx % len(COLORS)]
         if game.image_url:
             image_block = ft.Container(
@@ -355,7 +355,7 @@ class CatalogView:
                         ft.Row([
                             ft.TextButton(
                                 "Детальніше",
-                                on_click=lambda e, g=game: self._show_details(g),
+                                on_click=lambda e, g=game: self.show_details(g),
                                 style=ft.ButtonStyle(
                                     color=ft.Colors.INDIGO_700,
                                     padding=ft.Padding(4, 0, 4, 0),
@@ -363,7 +363,7 @@ class CatalogView:
                             ),
                             ft.Button(
                                 "В кошик",
-                                on_click=lambda e, g=game: self._add_to_cart(g),
+                                on_click=lambda e, g=game: self.add_to_cart(g),
                                 style=ft.ButtonStyle(
                                     bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE,
                                     shape=ft.RoundedRectangleBorder(radius=8),
@@ -381,13 +381,13 @@ class CatalogView:
     def create_view(self):
         self.all_games = self.ctrl.get_all_games()
 
-        self._reset_filters()
+        self.reset_filters()
 
         categories = self.ctrl.get_all_categories()
         genre_options = ["Всі"] + [c.name for c in categories]
         self.selected_genre = "Всі"
-        self._create_genre_row(genre_options)
-        self._apply_filters()
+        self.create_genre_row(genre_options)
+        self.apply_filters()
 
         filter_bar = ft.Container(
             content=ft.Column([
@@ -414,7 +414,7 @@ class CatalogView:
                     ], spacing=8),
                     ft.Button(
                         "Застосувати",
-                        on_click=lambda e: self._apply_filters(),
+                        on_click=lambda e: self.apply_filters(),
                         style=ft.ButtonStyle(
                             bgcolor=ft.Colors.WHITE,
                             color=ft.Colors.INDIGO_700,
